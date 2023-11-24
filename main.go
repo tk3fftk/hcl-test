@@ -39,7 +39,12 @@ func parse(filename string) (*hclwrite.File, error) {
 }
 
 func patchAttributes(base *hclwrite.File, overlay *hclwrite.File) (*hclwrite.File, error) {
-	overlayAttributes := overlay.Body().Attributes()
+	patchBodyAttributes(base.Body(), overlay.Body())
+	return base, nil
+}
+
+func patchBodyAttributes(base *hclwrite.Body, overlay *hclwrite.Body) (*hclwrite.Body, error) {
+	overlayAttributes := overlay.Attributes()
 
 	// use overlay attributes if they exist
 	for name, overlayAttribute := range overlayAttributes {
@@ -56,7 +61,7 @@ func patchAttributes(base *hclwrite.File, overlay *hclwrite.File) (*hclwrite.Fil
 			return nil, diags
 		}
 
-		base.Body().SetAttributeValue(name, val)
+		base.SetAttributeValue(name, val)
 	}
 
 	return base, nil

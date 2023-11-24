@@ -4,6 +4,12 @@ type = {
   "b" = 2
 }
 
+locals {
+  a = 1
+  b = 2
+  c = 3
+}
+
 data "aws_ami" "ubuntu" {
   most_recent = true
 
