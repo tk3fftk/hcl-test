@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclsyntax"
@@ -38,7 +39,7 @@ func parse(filename string) (*hclwrite.File, error) {
 	return file, nil
 }
 
-func patchAttributes(base *hclwrite.File, overlay *hclwrite.File) (*hclwrite.File, error) {
+func patchFileAttributes(base *hclwrite.File, overlay *hclwrite.File) (*hclwrite.File, error) {
 	patchBodyAttributes(base.Body(), overlay.Body())
 	return base, nil
 }
@@ -67,6 +68,94 @@ func patchBodyAttributes(base *hclwrite.Body, overlay *hclwrite.Body) (*hclwrite
 	return base, nil
 }
 
+func mergeFileBlocks(base *hclwrite.File, overlay *hclwrite.File) (*hclwrite.File, error) {
+	mergeBlocks(base.Body(), overlay.Body())
+	return base, nil
+}
+
+func mergeBlocks(base *hclwrite.Body, overlay *hclwrite.Body) (*hclwrite.Body, error) {
+	baseBlocks := base.Blocks()
+	overlayBlocks := overlay.Blocks()
+
+	baseResourceBlocks := map[string]*hclwrite.Block{}
+	baseDataBlocks := map[string]*hclwrite.Block{}
+
+	for _, baseBlock := range baseBlocks {
+		joinedLabel := strings.Join(baseBlock.Labels(), "_")
+		switch baseBlock.Type() {
+		case "resource":
+			baseResourceBlocks[joinedLabel] = baseBlock
+			base.RemoveBlock(baseBlock)
+		case "data":
+			baseDataBlocks[joinedLabel] = baseBlock
+			base.RemoveBlock(baseBlock)
+		case "locals":
+			// TODO: handle locals
+		default:
+			// Handle other types
+		}
+	}
+
+	// baseにあるblockをoverlayで上書き、なければ追加
+	for _, overlayBlock := range overlayBlocks {
+		joinedLabel := strings.Join(overlayBlock.Labels(), "_")
+		switch overlayBlock.Type() {
+		case "resource":
+			if baseResourceBlock, ok := baseResourceBlocks[joinedLabel]; ok {
+				mergedBlock, err := mergeBlock(baseResourceBlock, overlayBlock)
+				if err != nil {
+					return nil, err
+				}
+				baseResourceBlocks[joinedLabel] = mergedBlock
+			} else {
+				base.AppendBlock(overlayBlock)
+			}
+		case "data":
+			if baseDataBlock, ok := baseDataBlocks[joinedLabel]; ok {
+				mergedBlock, err := mergeBlock(baseDataBlock, overlayBlock)
+				if err != nil {
+					return nil, err
+				}
+				baseDataBlocks[joinedLabel] = mergedBlock
+			} else {
+				base.AppendBlock(overlayBlock)
+			}
+		case "locals":
+			// TODO
+		default:
+			// Handle other types
+		}
+	}
+
+	for _, baseResourceBlock := range baseResourceBlocks {
+		base.AppendBlock(baseResourceBlock)
+	}
+	for _, baseDataBlock := range baseDataBlocks {
+		base.AppendBlock(baseDataBlock)
+	}
+
+	return base, nil
+}
+
+func mergeBlock(base *hclwrite.Block, overlay *hclwrite.Block) (*hclwrite.Block, error) {
+	baseBlockBody := base.Body()
+	overlayBlockBody := overlay.Body()
+
+	// どちらにも定義があるattributeをpatch
+	patchBodyAttributes(baseBlockBody, overlayBlockBody)
+
+	// overlay側にのみ定義があるattirbuteを追加
+	// obtain attributes that are only defined in overlay
+	overlayAttributes := overlayBlockBody.Attributes()
+	for name, overlayAttribute := range overlayAttributes {
+		if baseBlockBody.GetAttribute(name) == nil {
+			baseBlockBody.SetAttributeRaw(name, overlayAttribute.Expr().BuildTokens(nil))
+		}
+	}
+
+	return base, nil
+}
+
 func main() {
 	base, err := parse("base.hcl")
 	if err != nil {
@@ -76,10 +165,11 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	output, err := patchAttributes(base, overlay)
+	output, err := patchFileAttributes(base, overlay)
 	if err != nil {
 		panic(err)
 	}
+	output, err = mergeFileBlocks(base, overlay)
 
 	fmt.Printf("%s", hclwrite.Format(output.Bytes()))
 }
