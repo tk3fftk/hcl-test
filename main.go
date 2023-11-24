@@ -41,6 +41,7 @@ func parse(filename string) (*hclwrite.File, error) {
 
 func patchFileAttributes(base *hclwrite.File, overlay *hclwrite.File) (*hclwrite.File, error) {
 	patchBodyAttributes(base.Body(), overlay.Body())
+	base.Body().AppendNewline()
 	return base, nil
 }
 
@@ -129,9 +130,11 @@ func mergeBlocks(base *hclwrite.Body, overlay *hclwrite.Body) (*hclwrite.Body, e
 
 	for _, baseResourceBlock := range baseResourceBlocks {
 		base.AppendBlock(baseResourceBlock)
+		base.AppendNewline()
 	}
 	for _, baseDataBlock := range baseDataBlocks {
 		base.AppendBlock(baseDataBlock)
+		base.AppendNewline()
 	}
 
 	return base, nil
