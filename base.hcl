@@ -1,4 +1,8 @@
 log_level = "info"
+type = {
+  "a" = 1
+  "b" = 2
+}
 
 data "aws_ami" "ubuntu" {
   most_recent = true
