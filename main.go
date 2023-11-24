@@ -140,23 +140,30 @@ func mergeBlocks(base *hclwrite.Body, overlay *hclwrite.Body) (*hclwrite.Body, e
 	return base, nil
 }
 
-func mergeBlock(base *hclwrite.Block, overlay *hclwrite.Block) (*hclwrite.Block, error) {
-	baseBlockBody := base.Body()
-	overlayBlockBody := overlay.Body()
+func mergeBlock(baseBlock *hclwrite.Block, overlayBlock *hclwrite.Block) (*hclwrite.Block, error) {
+	baseBlockBody := baseBlock.Body()
+	overlayBlockBody := overlayBlock.Body()
 
 	// どちらにも定義があるattributeをpatch
 	patchBodyAttributes(baseBlockBody, overlayBlockBody)
 
 	// overlay側にのみ定義があるattirbuteを追加
-	// obtain attributes that are only defined in overlay
-	overlayAttributes := overlayBlockBody.Attributes()
-	for name, overlayAttribute := range overlayAttributes {
+	// obtain and add attributes that are only defined in overlay
+	overlayBodyAttributes := overlayBlockBody.Attributes()
+	for name, overlayAttribute := range overlayBodyAttributes {
 		if baseBlockBody.GetAttribute(name) == nil {
 			baseBlockBody.SetAttributeRaw(name, overlayAttribute.Expr().BuildTokens(nil))
 		}
 	}
 
-	return base, nil
+	// add blocks that are defined in overlay
+	overlayBodyBlocks := overlayBlockBody.Blocks()
+	for _, overlayBlock := range overlayBodyBlocks {
+		baseBlockBody.AppendNewline()
+		baseBlockBody.AppendBlock(overlayBlock)
+	}
+
+	return baseBlock, nil
 }
 
 func main() {
