@@ -44,7 +44,8 @@ func patchAttributes(base *hclwrite.File, overlay *hclwrite.File) (*hclwrite.Fil
 	// use overlay attributes if they exist
 	for name, overlayAttribute := range overlayAttributes {
 		// Parse the attribute's tokens into an expression
-		expr, diags := hclsyntax.ParseExpression(overlayAttribute.Expr().BuildTokens(nil).Bytes(), "overlay.hcl", hcl.InitialPos)
+		// filename is used only for diagnostic messages. so it can be placeholder string.
+		expr, diags := hclsyntax.ParseExpression(overlayAttribute.Expr().BuildTokens(nil).Bytes(), "overlays", hcl.InitialPos)
 		if diags.HasErrors() {
 			return nil, diags
 		}
