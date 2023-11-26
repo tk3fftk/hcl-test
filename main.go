@@ -80,21 +80,24 @@ func mergeBlocks(base *hclwrite.Body, overlay *hclwrite.Body) (*hclwrite.Body, e
 
 	baseResourceBlocks := map[string]*hclwrite.Block{}
 	baseDataBlocks := map[string]*hclwrite.Block{}
+	baseLocals := map[string]*hclwrite.Attribute{}
+	overlayLocals := map[string]*hclwrite.Attribute{}
 
 	for _, baseBlock := range baseBlocks {
 		joinedLabel := strings.Join(baseBlock.Labels(), "_")
 		switch baseBlock.Type() {
 		case "resource":
 			baseResourceBlocks[joinedLabel] = baseBlock
-			base.RemoveBlock(baseBlock)
 		case "data":
 			baseDataBlocks[joinedLabel] = baseBlock
-			base.RemoveBlock(baseBlock)
 		case "locals":
-			// TODO: handle locals
+			for name, attribute := range baseBlock.Body().Attributes() {
+				baseLocals[name] = attribute
+			}
 		default:
-			// Handle other types
+			_ = fmt.Errorf("warn: type %v has come", baseBlock.Type())
 		}
+		base.RemoveBlock(baseBlock)
 	}
 
 	// baseにあるblockをoverlayで上書きして一時保管、なければbodyに直接追加
@@ -122,11 +125,23 @@ func mergeBlocks(base *hclwrite.Body, overlay *hclwrite.Body) (*hclwrite.Body, e
 				base.AppendBlock(overlayBlock)
 			}
 		case "locals":
-			// TODO
+			for name, attribute := range overlayBlock.Body().Attributes() {
+				overlayLocals[name] = attribute
+			}
 		default:
-			// Handle other types
+			_ = fmt.Errorf("warn: type %v has come", overlayBlock.Type())
 		}
 	}
+
+	for name, overlayLocalAttribute := range overlayLocals {
+		baseLocals[name] = overlayLocalAttribute
+	}
+	resultedLocalBlock := hclwrite.NewBlock("locals", nil)
+	for name, attribute := range baseLocals {
+		resultedLocalBlock.Body().SetAttributeRaw(name, attribute.Expr().BuildTokens(nil))
+	}
+	base.AppendBlock(resultedLocalBlock)
+	base.AppendNewline()
 
 	for _, baseResourceBlock := range baseResourceBlocks {
 		base.AppendBlock(baseResourceBlock)
