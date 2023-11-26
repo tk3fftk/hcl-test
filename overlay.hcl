@@ -20,3 +20,13 @@ data "aws_ami" "ubuntu" {
     values = ["arm64"]
   }
 }
+
+resource "aws_instance" "be" {
+  ami           = data.aws_ami.ubuntu.id
+  instance_type = "t3.medium"
+
+  tags = {
+    Name = "HelloWorld_Backend"
+  }
+  availability_zone = "ap-northeast-1a"
+}

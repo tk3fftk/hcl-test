@@ -97,7 +97,7 @@ func mergeBlocks(base *hclwrite.Body, overlay *hclwrite.Body) (*hclwrite.Body, e
 		}
 	}
 
-	// baseにあるblockをoverlayで上書き、なければ追加
+	// baseにあるblockをoverlayで上書きして一時保管、なければbodyに直接追加
 	for _, overlayBlock := range overlayBlocks {
 		joinedLabel := strings.Join(overlayBlock.Labels(), "_")
 		switch overlayBlock.Type() {
